@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "ydc-server": {
+      "type": "http",
+      "url": "https://api.you.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${YDC_API_KEY}"
+      },
+      "allowedTools": ["you-finance"]
+    }
+  }
+}

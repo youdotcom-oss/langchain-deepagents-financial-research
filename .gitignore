@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv/
+
+# Environment variables / secrets
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated reports
+eu_gdp_report.md
+eu_gdp_report.json
