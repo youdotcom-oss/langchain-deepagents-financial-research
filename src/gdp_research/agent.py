@@ -1,10 +1,27 @@
 import os
-from datetime import date
+from datetime import date, timedelta
 
+import httpx
 from deepagents import create_deep_agent
 from deepagents.backends.utils import create_file_data
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.memory import MemorySaver
+
+MCP_TIMEOUT = httpx.Timeout(120.0, read=600.0)
+
+
+def _mcp_http_client_factory(
+    headers: dict[str, str] | None = None,
+    timeout: httpx.Timeout | None = None,
+    auth: httpx.Auth | None = None,
+) -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        headers=headers,
+        timeout=MCP_TIMEOUT,
+        auth=auth,
+        follow_redirects=True,
+    )
+
 
 from gdp_research.output import GDPReport, extract_report_from_messages
 from gdp_research.prompts import (
@@ -12,17 +29,22 @@ from gdp_research.prompts import (
     RESEARCH_WORKFLOW,
 )
 
-SKILL_PATH = os.path.join(
+SKILLS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "skills",
     "you-finance",
-    "SKILL.md",
 )
 
 
-def _load_skill_content() -> str:
-    with open(SKILL_PATH) as f:
-        return f.read()
+def _load_skill_files() -> dict[str, any]:
+    """Load all files in the you-finance skill directory."""
+    files = {}
+    for filename in os.listdir(SKILLS_DIR):
+        filepath = os.path.join(SKILLS_DIR, filename)
+        if os.path.isfile(filepath):
+            with open(filepath) as f:
+                files[f"/skills/you-finance/{filename}"] = create_file_data(f.read())
+    return files
 
 
 async def create_gdp_research_agent(
@@ -51,6 +73,9 @@ async def create_gdp_research_agent(
                 "transport": "http",
                 "url": "https://api.you.com/mcp",
                 "headers": {"Authorization": f"Bearer {ydc_key}"},
+                "timeout": timedelta(seconds=120),
+                "sse_read_timeout": timedelta(seconds=600),
+                "httpx_client_factory": _mcp_http_client_factory,
             }
         }
     )
@@ -59,17 +84,12 @@ async def create_gdp_research_agent(
     tools = [t for t in all_tools if t.name == "you-finance"]
     if not tools:
         available = [t.name for t in all_tools]
-        raise RuntimeError(
-            f"you-finance tool not found. Available tools: {available}"
-        )
+        raise RuntimeError(f"you-finance tool not found. Available tools: {available}")
 
     today = date.today().strftime("%B %d, %Y")
     system_prompt = GDP_RESEARCH_PROMPT.format(date=today) + "\n\n" + RESEARCH_WORKFLOW
 
-    skill_content = _load_skill_content()
-    skill_files = {
-        "/skills/you-finance/SKILL.md": create_file_data(skill_content),
-    }
+    skill_files = _load_skill_files()
 
     checkpointer = MemorySaver()
 
