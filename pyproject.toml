@@ -1,7 +1,7 @@
 [project]
-name = "gdp-research"
-version = "0.1.0"
-description = "GDP macroeconomic research agent using LangChain Deep Agents and You.com Finance Research API"
+name = "finance-research"
+version = "0.2.0"
+description = "Finance research agent with configurable presets (GDP, Software Valuations) using LangChain Deep Agents and You.com Finance Research API"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [

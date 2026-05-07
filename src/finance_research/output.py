@@ -11,7 +11,7 @@ class ResearchFinding:
 
 
 @dataclass
-class GDPReport:
+class FinanceReport:
     query: str
     findings: list[ResearchFinding] = field(default_factory=list)
     raw_markdown: str = ""
@@ -37,9 +37,9 @@ class GDPReport:
         return json.dumps(self.to_json(), indent=2)
 
 
-def extract_report_from_messages(messages: list, query: str) -> GDPReport:
+def extract_report_from_messages(messages: list, query: str) -> FinanceReport:
     """Extract the final report from agent message history."""
-    report = GDPReport(query=query)
+    report = FinanceReport(query=query)
 
     for msg in reversed(messages):
         content = msg.content if hasattr(msg, "content") else str(msg)

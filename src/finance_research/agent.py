@@ -9,11 +9,8 @@ from deepagents.backends.utils import create_file_data
 from langchain.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 
-from gdp_research.output import GDPReport, extract_report_from_messages
-from gdp_research.prompts import (
-    GDP_RESEARCH_PROMPT,
-    RESEARCH_WORKFLOW,
-)
+from finance_research.output import FinanceReport, extract_report_from_messages
+from finance_research.prompts import PRESETS
 
 # ---------------------------------------------------------------------------
 # Tool transport method
@@ -205,18 +202,24 @@ async def _load_mcp_tools(api_key: str):
 # ---------------------------------------------------------------------------
 # Agent factory
 # ---------------------------------------------------------------------------
-async def create_gdp_research_agent(
+async def create_finance_research_agent(
+    preset: str = "gdp",
     output_format: str = "markdown",
     ydc_api_key: str | None = None,
     anthropic_api_key: str | None = None,
 ):
-    """Create a GDP macroeconomic research agent.
+    """Create a finance research agent with the given preset.
 
     Args:
+        preset: Which research preset to use. One of: "gdp", "software_valuations".
         output_format: "markdown" or "json" for the final report format.
         ydc_api_key: You.com API key. Falls back to YDC_API_KEY env var.
         anthropic_api_key: Anthropic API key. Falls back to ANTHROPIC_API_KEY env var.
     """
+    if preset not in PRESETS:
+        available = ", ".join(PRESETS.keys())
+        raise ValueError(f"Unknown preset '{preset}'. Available: {available}")
+
     ydc_key = ydc_api_key or os.environ["YDC_API_KEY"]
     if anthropic_api_key:
         os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
@@ -228,8 +231,14 @@ async def create_gdp_research_agent(
     else:
         tools = [_create_you_finance_tool(ydc_key)]
 
+    # --- Build system prompt from preset ---
+    preset_config = PRESETS[preset]
     today = date.today().strftime("%B %d, %Y")
-    system_prompt = GDP_RESEARCH_PROMPT.format(date=today) + "\n\n" + RESEARCH_WORKFLOW
+    system_prompt = (
+        preset_config["system_prompt"].format(date=today)
+        + "\n\n"
+        + preset_config["workflow"]
+    )
 
     skill_files = _load_skill_files()
 
@@ -243,8 +252,9 @@ async def create_gdp_research_agent(
         checkpointer=checkpointer,
     )
 
-    agent._gdp_skill_files = skill_files
-    agent._gdp_output_format = output_format
+    agent._skill_files = skill_files
+    agent._output_format = output_format
+    agent._preset = preset
 
     # Keep MCP client alive if using MCP transport
     if mcp_client is not None:
@@ -253,26 +263,29 @@ async def create_gdp_research_agent(
     return agent
 
 
-async def run_gdp_research(
+async def run_finance_research(
     query: str,
+    preset: str = "gdp",
     output_format: str = "markdown",
-    thread_id: str = "gdp-research-1",
+    thread_id: str = "finance-research-1",
     ydc_api_key: str | None = None,
     anthropic_api_key: str | None = None,
-) -> GDPReport:
-    """Run a GDP research query and return a structured report.
+) -> FinanceReport:
+    """Run a finance research query and return a structured report.
 
     Args:
         query: The research question to investigate.
+        preset: Which research preset to use. One of: "gdp", "software_valuations".
         output_format: "markdown" or "json".
         thread_id: Thread ID for conversation state.
         ydc_api_key: You.com API key. Falls back to YDC_API_KEY env var.
         anthropic_api_key: Anthropic API key. Falls back to ANTHROPIC_API_KEY env var.
 
     Returns:
-        A GDPReport with findings, citations, and formatted output.
+        A FinanceReport with findings, citations, and formatted output.
     """
-    agent = await create_gdp_research_agent(
+    agent = await create_finance_research_agent(
+        preset=preset,
         output_format=output_format,
         ydc_api_key=ydc_api_key,
         anthropic_api_key=anthropic_api_key,
@@ -281,7 +294,7 @@ async def run_gdp_research(
     result = await agent.ainvoke(
         {
             "messages": [{"role": "user", "content": query}],
-            "files": agent._gdp_skill_files,
+            "files": agent._skill_files,
         },
         config={"configurable": {"thread_id": thread_id}},
     )

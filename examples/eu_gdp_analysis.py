@@ -1,8 +1,8 @@
 """EU GDP Analysis Example
 
-Runs the GDP research agent with the target query:
-Analyze GDP for EU economic zone countries in 2022, identify anomalies,
-break down industries, and investigate macroeconomic trends.
+Runs the finance research agent with the gdp preset to analyze GDP for
+EU economic zone countries, identify anomalies, break down industries,
+and investigate macroeconomic trends.
 
 Usage:
     uv run python examples/eu_gdp_analysis.py
@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from gdp_research.agent import run_gdp_research
+from finance_research.agent import run_finance_research
 
 QUERY = (
     "What was the GDP in 2022 for each country within the EU economic zone. "
@@ -40,8 +40,9 @@ async def main():
     )
     args = parser.parse_args()
 
-    report = await run_gdp_research(
+    report = await run_finance_research(
         query=QUERY,
+        preset="gdp",
         output_format=args.format,
         thread_id="eu-gdp-2022",
     )
