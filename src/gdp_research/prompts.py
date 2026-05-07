@@ -32,21 +32,6 @@ For a broad question like "GDP for all EU countries with anomaly analysis and in
 
 Do NOT default to `exhaustive` for every call. Start with `standard` or `deep` and escalate only when needed.
 
-## Structured Output with `output_schema`
-
-The you-finance tool accepts an `output_schema` parameter that makes it return structured JSON instead of Markdown prose. Use it when:
-- The user needs structured data (tables, comparisons across countries).
-- The results will feed into downstream computation, charts, or dashboards.
-- You need a consistent schema across multiple queries for merging.
-
-Do NOT use `output_schema` when:
-- The user wants a narrative report with inline citations (use default Markdown mode).
-- The effort level is `lite` (not supported, returns 422).
-
-When `output_schema` is provided, `output.content` is a JSON object conforming to your schema, and `output.content_type` is `"object"` instead of `"text"`.
-
-Refer to the you-finance skill file for `output_schema` rules, examples, and the full OpenAPI parameter reference.
-
 ## Handling Results
 
 - The you-finance tool returns content with `[[n]]` citation tags and a sources list.

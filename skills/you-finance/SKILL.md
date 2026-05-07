@@ -135,64 +135,6 @@ Use `include_domains` when the workflow must force official or first-party evide
 
 Use `exclude_domains` to suppress known low-quality or irrelevant domains. Do not combine `include_domains` with `exclude_domains` or `boost_domains`.
 
-## Structured Output with `output_schema`
-
-When you need the API to return structured JSON instead of Markdown prose, pass `output_schema` as a parameter. This is especially useful for GDP research where you want machine-readable tables of country data.
-
-**Constraints:**
-- Only supported with `research_effort` values `standard`, `deep`, and `exhaustive`. Sending `output_schema` with `lite` returns `422`.
-- The root must be an object with `properties` defined.
-- Every object must set `additionalProperties: false`.
-- Every property must be listed in `required`.
-- Max nesting depth: 5. Max total properties: 100.
-- Recursive schemas, `allOf`, `not`, `format`, `pattern`, and most validation keywords are not supported.
-- Supported patterns: nested objects, arrays, enums, nested `anyOf`, non-recursive `$defs`/`$ref`.
-
-**When `output_schema` is provided**, `output.content` becomes a JSON object conforming to your schema (with `content_type: "object"`) instead of a Markdown string.
-
-**Example — GDP by country:**
-
-```json
-{
-  "input": "GDP in 2022 for all EU-27 member states in USD with YoY growth rate",
-  "research_effort": "deep",
-  "output_schema": {
-    "type": "object",
-    "properties": {
-      "countries": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "country": { "type": "string" },
-            "gdp_usd_billions": { "type": "number" },
-            "yoy_growth_pct": { "type": "number" },
-            "anomaly": { "type": "boolean" }
-          },
-          "required": ["country", "gdp_usd_billions", "yoy_growth_pct", "anomaly"],
-          "additionalProperties": false
-        }
-      },
-      "eu_aggregate_gdp_usd_billions": { "type": "number" },
-      "eu_average_growth_pct": { "type": "number" },
-      "summary": { "type": "string" }
-    },
-    "required": ["countries", "eu_aggregate_gdp_usd_billions", "eu_average_growth_pct", "summary"],
-    "additionalProperties": false
-  }
-}
-```
-
-**When to use `output_schema`:**
-- When the caller needs structured data for downstream computation or rendering (charts, tables, dashboards).
-- When the report requires a consistent tabular format across multiple queries.
-
-**When NOT to use `output_schema`:**
-- When the user wants a narrative report with inline citations (use default Markdown mode).
-- When using `research_effort: "lite"`.
-
-For the full parameter reference including all `source_control` options, `freshness` values, `country` codes, and `output_schema` rules, read the OpenAPI spec at `openapi_research.yaml` in this skill directory.
-
 ## Handling Results
 
 The broader orchestrator should:
