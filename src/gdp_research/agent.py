@@ -1,27 +1,13 @@
+import json
 import os
 from datetime import date, timedelta
+from typing import Literal
 
 import httpx
 from deepagents import create_deep_agent
 from deepagents.backends.utils import create_file_data
-from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
-
-MCP_TIMEOUT = httpx.Timeout(120.0, read=600.0)
-
-
-def _mcp_http_client_factory(
-    headers: dict[str, str] | None = None,
-    timeout: httpx.Timeout | None = None,
-    auth: httpx.Auth | None = None,
-) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        headers=headers,
-        timeout=MCP_TIMEOUT,
-        auth=auth,
-        follow_redirects=True,
-    )
-
 
 from gdp_research.output import GDPReport, extract_report_from_messages
 from gdp_research.prompts import (
@@ -29,6 +15,66 @@ from gdp_research.prompts import (
     RESEARCH_WORKFLOW,
 )
 
+# ---------------------------------------------------------------------------
+# Tool transport method
+# ---------------------------------------------------------------------------
+# Set to "http" for direct HTTP calls (recommended — simpler, no MCP overhead)
+# Set to "mcp" to use the You.com MCP server via langchain-mcp-adapters
+TOOL_TRANSPORT = "http"
+
+# ---------------------------------------------------------------------------
+# HTTP transport settings (used when TOOL_TRANSPORT = "http")
+# ---------------------------------------------------------------------------
+# read=None means no read timeout — the Finance Research API can take 10+ min
+# at "exhaustive" effort. Connect timeout stays at 30s for fast failure on
+# unreachable servers.
+HTTP_API_TIMEOUT = httpx.Timeout(30.0, read=None)
+
+# The endpoint URL. Switch between production and beta as needed:
+#   Production: "https://api.you.com/v1/research"
+#   Beta:       "https://ydc-finance-research-beta.up.railway.app/v1/finance_research"
+HTTP_ENDPOINT = "https://ydc-finance-research-beta.up.railway.app/v1/finance_research"
+
+# Whether to send the API key header. The beta endpoint doesn't require it;
+# production does (via X-API-Key).
+HTTP_SEND_API_KEY = False
+
+# ---------------------------------------------------------------------------
+# MCP transport settings (used when TOOL_TRANSPORT = "mcp")
+# ---------------------------------------------------------------------------
+# The MCP server exposes multiple tools; we filter to just "you-finance".
+# Note: langchain-mcp-adapters' allowedTools config is CLI-only, so we filter
+# manually in Python after calling get_tools().
+MCP_SERVER_URL = "https://api.you.com/mcp"
+MCP_TOOL_NAME = "you-finance"
+
+# Custom httpx timeout for MCP — the default SSE read timeout is 300s which
+# is too short for deep/exhaustive research. This factory overrides it.
+MCP_HTTP_TIMEOUT = httpx.Timeout(120.0, read=None)
+
+
+def _mcp_http_client_factory(
+    headers: dict[str, str] | None = None,
+    timeout: httpx.Timeout | None = None,
+    auth: httpx.Auth | None = None,
+) -> httpx.AsyncClient:
+    """Custom httpx client factory for MCP transport.
+
+    langchain-mcp-adapters passes its own timeout, but the conversion from
+    timedelta -> httpx.Timeout doesn't always propagate correctly through the
+    MCP SDK's streamable HTTP layer. This factory forces our timeout directly.
+    """
+    return httpx.AsyncClient(
+        headers=headers,
+        timeout=MCP_HTTP_TIMEOUT,
+        auth=auth,
+        follow_redirects=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Shared config
+# ---------------------------------------------------------------------------
 SKILLS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "skills",
@@ -43,10 +89,122 @@ def _load_skill_files() -> dict[str, any]:
         filepath = os.path.join(SKILLS_DIR, filename)
         if os.path.isfile(filepath):
             with open(filepath) as f:
-                files[f"/skills/you-finance/{filename}"] = create_file_data(f.read())
+                files[f"/skills/you-finance/{filename}"] = create_file_data(
+                    f.read()
+                )
     return files
 
 
+# ---------------------------------------------------------------------------
+# HTTP tool implementation
+# ---------------------------------------------------------------------------
+def _create_you_finance_tool(api_key: str):
+    """Create a LangChain tool that calls the You.com Finance Research API via direct HTTP."""
+
+    @tool(parse_docstring=True)
+    async def you_finance(
+        input: str,
+        research_effort: Literal["lite", "standard", "deep", "exhaustive"] = "standard",
+        source_control: dict | None = None,
+    ) -> str:
+        """Research financial and macroeconomic topics with cited sources.
+
+        Calls the You.com Finance Research API which runs multi-step research,
+        consults structured public data (World Bank, IMF, OECD, Eurostat, FRED),
+        verifies sources, and returns cited answers with [[n]] source tags.
+
+        Args:
+            input: The research question (max 40,000 characters).
+            research_effort: How thorough the research should be. lite is fast,
+                standard is default, deep is thorough, exhaustive is most complete.
+            source_control: Optional dict to control web sources. Supports
+                include_domains, exclude_domains, boost_domains, freshness, country.
+        """
+        body = {
+            "input": input,
+            "research_effort": research_effort,
+        }
+        if source_control is not None:
+            body["source_control"] = source_control
+
+        headers = {"Content-Type": "application/json"}
+        if HTTP_SEND_API_KEY:
+            headers["X-API-Key"] = api_key
+
+        async with httpx.AsyncClient(timeout=HTTP_API_TIMEOUT) as client:
+            response = await client.post(
+                HTTP_ENDPOINT,
+                headers=headers,
+                json=body,
+            )
+
+        if response.status_code != 200:
+            return f"Error {response.status_code}: {response.text}"
+
+        data = response.json()
+        output = data.get("output", {})
+        content = output.get("content", "")
+        content_type = output.get("content_type", "text")
+        sources = output.get("sources", [])
+
+        if content_type == "object":
+            result = json.dumps(content, indent=2)
+        else:
+            result = content
+
+        if sources:
+            result += "\n\n### Sources\n"
+            for i, src in enumerate(sources, 1):
+                title = src.get("title", "Untitled")
+                url = src.get("url", "")
+                result += f"[[{i}]] {title}: {url}\n"
+
+        return result
+
+    return you_finance
+
+
+# ---------------------------------------------------------------------------
+# MCP tool loader
+# ---------------------------------------------------------------------------
+async def _load_mcp_tools(api_key: str):
+    """Load the you-finance tool via MCP transport.
+
+    Returns a tuple of (tools_list, mcp_client). The caller must keep a
+    reference to mcp_client for the lifetime of the agent — the MCP session
+    closes when the client is garbage collected.
+    """
+    from langchain_mcp_adapters.client import MultiServerMCPClient
+
+    client = MultiServerMCPClient(
+        {
+            "ydc-server": {
+                "transport": "http",
+                "url": MCP_SERVER_URL,
+                "headers": {"Authorization": f"Bearer {api_key}"},
+                "timeout": timedelta(seconds=600),
+                "sse_read_timeout": timedelta(seconds=600),
+                "httpx_client_factory": _mcp_http_client_factory,
+            }
+        }
+    )
+
+    all_tools = await client.get_tools()
+
+    # langchain-mcp-adapters' allowedTools is CLI-only, so filter manually
+    tools = [t for t in all_tools if t.name == MCP_TOOL_NAME]
+    if not tools:
+        available = [t.name for t in all_tools]
+        raise RuntimeError(
+            f"{MCP_TOOL_NAME} tool not found. Available tools: {available}"
+        )
+
+    return tools, client
+
+
+# ---------------------------------------------------------------------------
+# Agent factory
+# ---------------------------------------------------------------------------
 async def create_gdp_research_agent(
     output_format: str = "markdown",
     ydc_api_key: str | None = None,
@@ -58,33 +216,17 @@ async def create_gdp_research_agent(
         output_format: "markdown" or "json" for the final report format.
         ydc_api_key: You.com API key. Falls back to YDC_API_KEY env var.
         anthropic_api_key: Anthropic API key. Falls back to ANTHROPIC_API_KEY env var.
-
-    Returns:
-        A tuple of (agent, mcp_client) — keep a reference to mcp_client
-        for the lifetime of the agent.
     """
     ydc_key = ydc_api_key or os.environ["YDC_API_KEY"]
     if anthropic_api_key:
         os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
 
-    client = MultiServerMCPClient(
-        {
-            "ydc-server": {
-                "transport": "http",
-                "url": "https://api.you.com/mcp",
-                "headers": {"Authorization": f"Bearer {ydc_key}"},
-                "timeout": timedelta(seconds=120),
-                "sse_read_timeout": timedelta(seconds=600),
-                "httpx_client_factory": _mcp_http_client_factory,
-            }
-        }
-    )
-
-    all_tools = await client.get_tools()
-    tools = [t for t in all_tools if t.name == "you-finance"]
-    if not tools:
-        available = [t.name for t in all_tools]
-        raise RuntimeError(f"you-finance tool not found. Available tools: {available}")
+    # --- Choose tool transport ---
+    mcp_client = None
+    if TOOL_TRANSPORT == "mcp":
+        tools, mcp_client = await _load_mcp_tools(ydc_key)
+    else:
+        tools = [_create_you_finance_tool(ydc_key)]
 
     today = date.today().strftime("%B %d, %Y")
     system_prompt = GDP_RESEARCH_PROMPT.format(date=today) + "\n\n" + RESEARCH_WORKFLOW
@@ -103,7 +245,10 @@ async def create_gdp_research_agent(
 
     agent._gdp_skill_files = skill_files
     agent._gdp_output_format = output_format
-    agent._mcp_client = client
+
+    # Keep MCP client alive if using MCP transport
+    if mcp_client is not None:
+        agent._mcp_client = mcp_client
 
     return agent
 
