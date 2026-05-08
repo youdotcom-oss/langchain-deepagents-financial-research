@@ -1,9 +1,17 @@
+import asyncio
 import json
+import logging
 import os
+import ssl
 from datetime import date, timedelta
 from typing import Literal
 
 import httpx
+
+logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+RETRY_BACKOFF_SECONDS = 5
 from deepagents import create_deep_agent
 from deepagents.backends.utils import create_file_data
 from langchain.tools import tool
@@ -86,9 +94,7 @@ def _load_skill_files() -> dict[str, any]:
         filepath = os.path.join(SKILLS_DIR, filename)
         if os.path.isfile(filepath):
             with open(filepath) as f:
-                files[f"/skills/you-finance/{filename}"] = create_file_data(
-                    f.read()
-                )
+                files[f"/skills/you-finance/{filename}"] = create_file_data(f.read())
     return files
 
 
@@ -128,12 +134,32 @@ def _create_you_finance_tool(api_key: str):
         if HTTP_SEND_API_KEY:
             headers["X-API-Key"] = api_key
 
-        async with httpx.AsyncClient(timeout=HTTP_API_TIMEOUT) as client:
-            response = await client.post(
-                HTTP_ENDPOINT,
-                headers=headers,
-                json=body,
-            )
+        last_error = None
+        response = None
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                async with httpx.AsyncClient(timeout=HTTP_API_TIMEOUT) as client:
+                    response = await client.post(
+                        HTTP_ENDPOINT,
+                        headers=headers,
+                        json=body,
+                    )
+                break
+            except (ssl.SSLError, httpx.ConnectError, httpx.RemoteProtocolError) as e:
+                last_error = e
+                if attempt < MAX_RETRIES:
+                    wait = RETRY_BACKOFF_SECONDS * attempt
+                    logger.warning(
+                        "you-finance call failed (attempt %d/%d): %s. Retrying in %ds...",
+                        attempt,
+                        MAX_RETRIES,
+                        e,
+                        wait,
+                    )
+                    await asyncio.sleep(wait)
+
+        if response is None:
+            return f"Error: request failed after {MAX_RETRIES} attempts. Last error: {last_error}"
 
         if response.status_code != 200:
             return f"Error {response.status_code}: {response.text}"
@@ -245,7 +271,7 @@ async def create_finance_research_agent(
     checkpointer = MemorySaver()
 
     agent = create_deep_agent(
-        model="anthropic:claude-sonnet-4-6",
+        model="anthropic:claude-opus-4-7",
         tools=tools,
         system_prompt=system_prompt,
         skills=["/skills/"],

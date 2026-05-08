@@ -22,8 +22,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from finance_research.agent import run_finance_research
 
 QUERY = (
-    "What was the GDP in 2022 for each country within the EU economic zone. "
-    "Highlight those that are increasing or decreasing at an anomalous rate. "
+    "In 2025, look at the GDP of each country within the EU economic zone, and "
+    "highlight those that are increasing or decreasing at an anomalous rate. "
     "Specify and break down which industries are causing these shifts and "
     "investigate macroeconomic trends within each country that are contributing."
 )
