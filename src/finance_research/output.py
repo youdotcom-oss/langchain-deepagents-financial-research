@@ -38,9 +38,33 @@ class FinanceReport:
 
 
 def extract_report_from_messages(messages: list, query: str) -> FinanceReport:
-    """Extract the final report from agent message history."""
+    """Extract the final report from agent message history.
+
+    Checks two sources in order:
+    1. The agent's write_file tool calls for /final_report.md (the agent writes
+       the full report to its virtual filesystem).
+    2. The last long AI message (fallback for when the agent returns the report
+       inline instead of writing to a file).
+    """
     report = FinanceReport(query=query)
 
+    # Strategy 1: Look for write_file calls targeting /final_report.md
+    for msg in reversed(messages):
+        tool_calls = getattr(msg, "tool_calls", None)
+        if not tool_calls:
+            continue
+        for tc in tool_calls:
+            if tc.get("name") != "write_file":
+                continue
+            args = tc.get("args", {})
+            path = args.get("file_path", "") or args.get("path", "")
+            content = args.get("content", "")
+            if "final_report" in path and len(content) > 200:
+                report.raw_markdown = content
+                report.findings = _parse_findings(content)
+                return report
+
+    # Strategy 2: Fall back to the last long AI message
     for msg in reversed(messages):
         content = msg.content if hasattr(msg, "content") else str(msg)
         if isinstance(content, str) and len(content) > 200:
