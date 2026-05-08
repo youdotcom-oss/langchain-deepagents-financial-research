@@ -13,6 +13,7 @@ import argparse
 import asyncio
 import os
 import sys
+from datetime import datetime
 
 from dotenv import load_dotenv
 
@@ -47,7 +48,9 @@ async def main():
         thread_id="eu-gdp-2022",
     )
 
-    output_file = f"eu_gdp_report.{'json' if args.format == 'json' else 'md'}"
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ext = "json" if args.format == "json" else "md"
+    output_file = f"eu_gdp_report_{ts}.{ext}"
     with open(output_file, "w") as f:
         if args.format == "json":
             f.write(report.to_json_string())
