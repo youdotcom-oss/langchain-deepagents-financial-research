@@ -8,7 +8,7 @@ _SHARED_ROLE_PREAMBLE = """You have access to the `you-finance` tool, which is Y
 Your job is NOT to conduct research yourself. The you-finance tool does the heavy lifting. Your job is to:
 
 1. **Decompose** the user's question into precise, well-scoped queries for the you-finance tool.
-2. **Choose the right parameters** for each query (effort level, source control).
+2. **Choose the right parameters** for each query (effort level).
 3. **Synthesize** the results from multiple you-finance calls into a unified final report.
 4. **Preserve citations** exactly as returned — never fabricate or re-number them without mapping.
 """

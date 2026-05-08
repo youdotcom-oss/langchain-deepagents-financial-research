@@ -29,7 +29,7 @@ Use the finance research agent for:
 - Financial-market and benchmark questions where contract month, instrument, date, field, currency, or unit matters.
 - Derived finance calculations where every source input must be retrieved, aligned, and cited before computing.
 - Finance answer verification inside a larger agentic plan, especially when another branch produced a plausible but uncited numeric claim.
-- Source-constrained finance research, such as limiting evidence to official domains with `source_control.include_domains`.
+- Source-constrained finance research where you need evidence from specific domains.
 
 Prefer the finance research agent over generic web search when the question has any of these properties:
 
@@ -51,41 +51,12 @@ Do not use the finance research agent as the first tool for:
 
 In an in-process backend workflow, prefer direct service orchestration:
 
-```python
-from ydc_services.libs.services.search.schemas.finance_deep_search import (
-    FinanceDeepSearchRequest,
-)
-from ydc_services.services.ai_search.finance_deep_search_service import (
-    get_finance_deep_search_service,
-)
-
-service = get_finance_deep_search_service()
-response = await service.run(
-    FinanceDeepSearchRequest(
-        input=question,
-        research_effort="standard",
-        source_control=source_control,
-    )
-)
-```
-
-Use the public API route only when the caller is an external client or a boundary test:
-
-```http
-POST /v1/finance/deep_search
-```
-
 Request shape:
 
 ```json
 {
   "input": "What was the latest disclosed value of ...?",
-  "research_effort": "standard",
-  "source_control": {
-    "include_domains": ["sec.gov", "company.com"],
-    "freshness": "year",
-    "country": "US"
-  }
+  "research_effort": "standard"
 }
 ```
 
@@ -119,21 +90,9 @@ For a broader agentic workflow:
    - `standard`: default for most finance research.
    - `deep`: difficult filings, conflicting sources, exact macro/statistical values.
    - `exhaustive`: only for high-value tasks where latency/cost are acceptable.
-4. Apply `source_control` when the workflow already knows the authoritative domain set.
-5. Run the finance research agent as an evidence branch, not as an unbounded conversational agent.
+4. Run the finance research agent as an evidence branch, not as an unbounded conversational agent.
 6. Treat the returned answer as a cited research artifact. Preserve its citations when synthesizing with other branches.
 7. If multiple branches disagree, prefer the branch with the most direct primary source and exact period/unit alignment.
-
-## Source Control Guidance
-
-Use `include_domains` when the workflow must force official or first-party evidence:
-
-- SEC/company filing questions: `["sec.gov"]` plus the company investor-relations domain if needed.
-- US macro/statistics: `["bls.gov", "bea.gov", "fred.stlouisfed.org"]` depending on the metric.
-- International macro: official statistical agency, World Bank, IMF, OECD, or central-bank domains.
-- Energy/commodity questions: official agency, exchange, benchmark publisher, or report publisher domains.
-
-Use `exclude_domains` to suppress known low-quality or irrelevant domains. Do not combine `include_domains` with `exclude_domains` or `boost_domains`.
 
 ## Handling Results
 

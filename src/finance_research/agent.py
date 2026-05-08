@@ -108,7 +108,6 @@ def _create_you_finance_tool(api_key: str):
     async def you_finance(
         input: str,
         research_effort: Literal["lite", "standard", "deep", "exhaustive"] = "standard",
-        source_control: dict | None = None,
     ) -> str:
         """Research financial and macroeconomic topics with cited sources.
 
@@ -120,15 +119,11 @@ def _create_you_finance_tool(api_key: str):
             input: The research question (max 40,000 characters).
             research_effort: How thorough the research should be. lite is fast,
                 standard is default, deep is thorough, exhaustive is most complete.
-            source_control: Optional dict to control web sources. Supports
-                include_domains, exclude_domains, boost_domains, freshness, country.
         """
         body = {
             "input": input,
             "research_effort": research_effort,
         }
-        if source_control is not None:
-            body["source_control"] = source_control
 
         headers = {"Content-Type": "application/json"}
         if HTTP_SEND_API_KEY:
