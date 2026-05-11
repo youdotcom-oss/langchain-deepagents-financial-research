@@ -9,4 +9,6 @@ dependencies = [
     "langchain-anthropic>=1.4.3",
     "langchain-mcp-adapters>=0.2.2",
     "python-dotenv>=1.2.2",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
 ]
