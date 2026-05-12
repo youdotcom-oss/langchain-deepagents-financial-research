@@ -1,6 +1,6 @@
 ---
-name: you-finance
-description: Use this skill when the workflow needs finance-grade research, source-backed numeric answers, or exact public/company/macroeconomic evidence. Invokes the you-finance MCP tool which internally runs multi-step research, consults structured public data (World Bank, IMF, OECD, Eurostat, FRED), verifies sources across parallel branches, and returns cited answers with [[n]] source tags.
+name: youdotcom-finance-research
+description: Use this skill when the workflow needs finance-grade research, source-backed numeric answers, or exact public/company/macroeconomic evidence. Invokes the you-finance MCP tool which internally runs multi-step research, consults structured public data (World Bank, IMF, OECD, Eurostat, FRED) as well as licensed private data, verifies sources across parallel branches, and returns cited answers with [[n]] source tags.
 allowed-tools: you-finance
 ---
 
@@ -56,7 +56,7 @@ Request shape:
 ```json
 {
   "input": "What was the latest disclosed value of ...?",
-  "research_effort": "standard"
+  "research_effort": "deep"
 }
 ```
 
@@ -85,9 +85,7 @@ For a broader agentic workflow:
 
 1. Classify whether the user question has a finance evidence requirement.
 2. Extract the exact checklist: entity, geography, metric, fiscal/calendar period, quarter/month/date, source vintage, unit, scale, currency, stock vs flow, contract month, and output format.
-3. Decide the finance research effort:
-   - `lite` or `ulow`: quick smoke checks or low-stakes triage.
-   - `standard`: default for most finance research.
+3. Decide the finance research effort. The API does accept `lite` and `standard` but those are not available to you.
    - `deep`: difficult filings, conflicting sources, exact macro/statistical values.
    - `exhaustive`: only for high-value tasks where latency/cost are acceptable.
 4. Run the finance research agent as an evidence branch, not as an unbounded conversational agent.

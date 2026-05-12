@@ -22,7 +22,7 @@ Each preset provides a tailored system prompt, query decomposition strategy, and
 ├── skills/
 │   └── you-finance/
 │       ├── SKILL.md             # Finance Research API orchestration skill
-│       └── openapi_research.yaml # OpenAPI spec for reference
+│       └── openapi_finance_research.yaml # OpenAPI spec for reference
 ├── src/
 │   └── finance_research/
 │       ├── agent.py             # Deep Agent setup with HTTP/MCP tool

@@ -107,13 +107,15 @@ def _create_you_finance_tool(api_key: str):
     @tool(parse_docstring=True)
     async def you_finance(
         input: str,
-        research_effort: Literal["lite", "standard", "deep", "exhaustive"] = "standard",
+        research_effort: Literal["deep", "exhaustive"] = "deep",
     ) -> str:
         """Research financial and macroeconomic topics with cited sources.
 
-        Calls the You.com Finance Research API which runs multi-step research,
-        consults structured public data (World Bank, IMF, OECD, Eurostat, FRED),
-        verifies sources, and returns cited answers with [[n]] source tags.
+        Calls the You.com Finance Research API to get finance-grade research, source-backed numeric answers,
+        or exact public/company/macroeconomic evidence.
+        Invokes the you-finance MCP tool which internally runs multi-step research,
+        consults structured public data (World Bank, IMF, OECD, Eurostat, FRED) as well as licensed private data,
+        verifies sources across parallel branches, and returns cited answers with [[n]] source tags.
 
         Args:
             input: The research question (max 40,000 characters).

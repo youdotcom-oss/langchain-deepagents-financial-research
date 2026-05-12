@@ -1,0 +1,290 @@
+openapi: 3.1.0
+info:
+  title: You.com Finance Research API
+  description: Finance-focused multi-step research with competitive accuracy at same price points and latencies as the Research API
+  version: 0.0.1
+servers:
+  - url: https://api.you.com
+    x-fern-server-name: Production
+paths:
+  /v1/finance_research:
+    post:
+      operationId: finance_research
+      summary: Returns comprehensive finance-grade research answers with multi-step reasoning
+      description: >-
+        The Finance Research API is purpose-built for financial questions. Like the Research API, it
+        runs multiple searches, reads through sources, and synthesizes everything into a
+        thorough, well-cited answer — but its retrieval index is optimized for financial data:
+        earnings reports, SEC filings, analyst coverage, market data, and financial news.
+
+        Use it when you need credible, sourced answers to financial questions: company fundamentals,
+        market trends, competitive analysis, earnings summaries, or macroeconomic research.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              input: What were the key drivers of NVIDIA's (NVDA) revenue growth in fiscal year 2025?
+              research_effort: deep
+            schema:
+              type: object
+              required:
+                - input
+              properties:
+                input:
+                  type: string
+                  maxLength: 40000
+                  description: >-
+                    The financial research question or complex query requiring in-depth
+                    investigation and multi-step reasoning.
+
+
+                    Note: The maximum length of the input is 40,000 characters.
+                  example: What were the key drivers of NVIDIA's revenue growth in fiscal year 2025?
+                research_effort:
+                  type: string
+                  description: >-
+                    Controls how much time and effort the Finance Research API spends on your
+                    question. Higher effort levels run more searches and dig
+                    deeper into sources, at the cost of a longer response time.
+
+
+                    Available levels:
+
+                    - `deep`: The default. Spends more time researching and
+                    cross-referencing sources. Good for most financial questions,
+                    including multi-company comparisons, earnings analysis, and
+                    regulatory research.
+
+                    - `exhaustive`: The most thorough option. Explores the topic
+                    as fully as possible, best suited for complex financial research
+                    tasks where you want the highest quality result.
+                  example: deep
+                  enum:
+                    - deep
+                    - exhaustive
+                  default: deep
+      responses:
+        "200":
+          description: >-
+            A JSON object containing a comprehensive finance-grade answer with citations and
+            supporting search results
+          content:
+            application/json:
+              example:
+                output:
+                  content: |-
+                    For fiscal year 2025, ended January 26, 2025, NVIDIA's revenue rose to **$130.5 billion, up 114% year over year**.[[1]] The main drivers were:
+
+                    - **Data Center demand**, especially accelerated computing and AI platforms: Data Center revenue was **up 142%**, driven by demand for NVIDIA's **Hopper architecture** for large language models, recommendation engines, and generative AI applications; NVIDIA also began shipping **Blackwell** production systems in Q4 FY2025.[[1]]
+                    - **Compute & Networking segment growth**: revenue increased **145%**, with Data Center compute up **162%** on Hopper demand and Data Center networking up **51%**, driven by Ethernet for AI, including Spectrum-X.[[1]]
+                    - Smaller but positive contributions from other markets: **Gaming revenue rose 9%** on GeForce RTX 40 Series GPUs, **Professional Visualization rose 21%** on Ada RTX workstation adoption, and **Automotive rose 55%** from self-driving platform sales.[[1]]
+
+                    In short, NVIDIA's FY2025 growth was overwhelmingly driven by **AI-related Data Center compute and networking demand**, with additional support from gaming, professional visualization, and automotive.
+                  content_type: text
+                  sources:
+                    - url: https://investor.nvidia.com/financial-info/financial-reports/default.aspx
+                      title: NVIDIA Corporation - Financial Reports
+              schema:
+                type: object
+                required:
+                  - output
+                properties:
+                  output:
+                    type: object
+                    description: The research output containing the answer and sources.
+                    required:
+                      - content
+                      - content_type
+                      - sources
+                    properties:
+                      content:
+                        type: string
+                        description: >-
+                          The comprehensive finance-grade response with inline citations.
+                          Content is a Markdown string with numbered citations that reference
+                          the items in the sources array.
+                        example: |-
+                          For fiscal year 2025, ended January 26, 2025, NVIDIA's revenue rose to **$130.5 billion, up 114% year over year**.[[1]]
+                          The main drivers were Data Center demand (up 142%), Compute & Networking growth (up 145%), and smaller contributions from Gaming, Professional Visualization, and Automotive.
+                      content_type:
+                        type: string
+                        description: The format of the content field.
+                        enum:
+                          - text
+                        example: text
+                      sources:
+                        type: array
+                        description: A list of web sources used to generate the answer.
+                        items:
+                          type: object
+                          required:
+                            - url
+                          properties:
+                            url:
+                              type: string
+                              description: The URL of the source webpage.
+                              example: https://investor.apple.com/sec-filings/annual-reports/default.aspx
+                            title:
+                              type: string
+                              description: The title of the source webpage.
+                              example: "Apple Inc. Annual Report FY2024 (Form 10-K)"
+                            snippets:
+                              type: array
+                              description: >-
+                                Relevant excerpts from the source page that were
+                                used in generating the answer.
+                              items:
+                                type: string
+                                example: >-
+                                  Net sales for fiscal 2024 were $391.035 billion compared to
+                                  $383.285 billion in fiscal 2023, an increase of $7.750 billion or 2%.
+        "422":
+          description: Unprocessable Entity. Request validation failed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - type
+                        - loc
+                        - msg
+                        - input
+                      properties:
+                        type:
+                          type: string
+                          description: The validation error type.
+                          example: missing
+                        loc:
+                          type: array
+                          description: The location of the error as a path of segments (strings for field names, integers for byte offsets).
+                          items:
+                            oneOf:
+                              - type: string
+                              - type: integer
+                          example: ["body", "input"]
+                        msg:
+                          type: string
+                          description: A human-readable description of the error.
+                          example: Field required
+                        input:
+                          description: The input value that caused the error.
+                          oneOf:
+                            - type: string
+                            - type: object
+                        ctx:
+                          type: object
+                          description: Additional context about the error.
+                          additionalProperties: true
+              examples:
+                missingField:
+                  summary: Required field missing
+                  value:
+                    detail:
+                      - type: missing
+                        loc: ["body", "input"]
+                        msg: Field required
+                        input: {}
+                invalidEnum:
+                  summary: Invalid enum value for research_effort
+                  value:
+                    detail:
+                      - type: enum
+                        loc: ["body", "research_effort"]
+                        msg: "Input should be 'deep' or 'exhaustive'"
+                        input: invalid_value
+                        ctx:
+                          expected: "'deep' or 'exhaustive'"
+                stringTooLong:
+                  summary: Input exceeds maximum length
+                  value:
+                    detail:
+                      - type: string_too_long
+                        loc: ["body", "input"]
+                        msg: String should have at most 40000 characters
+                        input: <truncated>
+                        ctx:
+                          max_length: 40000
+                invalidJson:
+                  summary: Invalid JSON body
+                  value:
+                    detail:
+                      - type: json_invalid
+                        loc: ["body", 115]
+                        msg: JSON decode error
+                        input: {}
+                        ctx:
+                          error: Invalid control character at
+        "401":
+          description: Unauthorized. Problems with API key.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    description: Error detail message.
+              examples:
+                missingApiKey:
+                  summary: Missing API key
+                  value:
+                    detail: API key is required
+                invalidOrExpired:
+                  summary: Invalid/expired API key
+                  value:
+                    detail: Invalid or expired API key
+                otherAuthParsing:
+                  summary: Other auth parsing errors
+                  value:
+                    detail: <error message>
+        "403":
+          description: Forbidden. API key lacks scope for this path.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+              examples:
+                missingScopes:
+                  summary: Missing required scopes
+                  value:
+                    detail: Missing required scopes
+        "500":
+          description: >-
+            Internal Server Error during authentication/authorization
+            middleware.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+              examples:
+                authFailure:
+                  summary: Authentication failure
+                  value:
+                    detail: Internal authentication error
+                authorizationFailure:
+                  summary: Authorization failure
+                  value:
+                    detail: Internal authorization error
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: >-
+        A unique API Key is required to authorize API access. [Get your API Key
+        with free credits](https://you.com/platform).
