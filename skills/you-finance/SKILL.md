@@ -1,6 +1,6 @@
 ---
 name: youdotcom-finance-research
-description: Use this skill when the workflow needs finance-grade research, source-backed numeric answers, or exact public/company/macroeconomic evidence. Invokes the you-finance MCP tool which internally runs multi-step research, consults structured public data (World Bank, IMF, OECD, Eurostat, FRED) as well as licensed private data, verifies sources across parallel branches, and returns cited answers with [[n]] source tags.
+description: Use this skill when the workflow needs finance-grade research, source-backed numeric answers, or exact company, market, or macroeconomic evidence with citations.
 allowed-tools: you-finance
 ---
 
@@ -12,13 +12,7 @@ Use this skill when a broader agentic workflow needs finance-grade research, sou
 
 The finance research agent is a specialist evidence engine. It is best used as a delegated branch inside a larger workflow when the main agent needs high-confidence finance answers rather than broad conversational search.
 
-It combines several complementary evidence paths:
-
-- You.com deep research for broad discovery and context.
-- Structured public-data tools for World Bank, IMF, OECD, and FRED-style macro verification.
-- Specialized finance and company-research sources when configured, including company fundamentals, filings, disclosures, market context, and domain-specific knowledge cards.
-- Dedicated web search and page fetch for exact filing notes, official reports, benchmark pages, exchange pages, and other page-level evidence.
-- A synthesis/citation pass that returns a public response with `[[n]]` source tags.
+Its retrieval index is optimized for financial data: earnings reports, SEC filings, analyst coverage, market data, and financial news. It runs multiple searches, reads through sources, and synthesizes everything into a thorough, well-cited answer.
 
 ## When To Use
 
@@ -45,13 +39,17 @@ Do not use the finance research agent as the first tool for:
 - Lightweight conversational answers that do not require source-backed finance evidence.
 - Pure calculation where all inputs are already trusted and available.
 - Real-time trading execution, investment advice, or portfolio recommendations.
-- Internal endpoint probing. In repo-local orchestration, call the finance service/module directly instead of making HTTP calls to internal endpoints.
 
 ## How To Invoke
 
-In an in-process backend workflow, prefer direct service orchestration:
+### Via MCP (preferred if the `you-finance` tool is available)
 
-Request shape:
+The `you-finance` tool is served by the You.com MCP server:
+
+- **URL:** `https://api.you.com/mcp`
+- **Auth:** `Authorization: Bearer <YDC_API_KEY>`
+
+Call the tool with:
 
 ```json
 {
@@ -60,7 +58,22 @@ Request shape:
 }
 ```
 
-Response shape:
+### Via HTTP (direct API call)
+
+**Endpoint:** `POST https://api.you.com/v1/finance_research`  
+**Auth header:** `X-API-Key: <YDC_API_KEY>`  
+**Content-Type:** `application/json`
+
+Request body:
+
+```json
+{
+  "input": "What was the latest disclosed value of ...?",
+  "research_effort": "deep"
+}
+```
+
+### Response shape
 
 ```json
 {
@@ -77,7 +90,7 @@ Response shape:
 }
 ```
 
-The citation contract is strict: final `output.content` should use `[[n]]` tags only. `[[1]]` maps to `output.sources[0]`, `[[2]]` maps to `output.sources[1]`, and so on.
+The citation contract is strict: `output.content` uses `[[n]]` tags only. `[[1]]` maps to `output.sources[0]`, `[[2]]` maps to `output.sources[1]`, and so on.
 
 ## Orchestration Pattern
 
@@ -85,12 +98,12 @@ For a broader agentic workflow:
 
 1. Classify whether the user question has a finance evidence requirement.
 2. Extract the exact checklist: entity, geography, metric, fiscal/calendar period, quarter/month/date, source vintage, unit, scale, currency, stock vs flow, contract month, and output format.
-3. Decide the finance research effort. The API does accept `lite` and `standard` but those are not available to you.
-   - `deep`: difficult filings, conflicting sources, exact macro/statistical values.
-   - `exhaustive`: only for high-value tasks where latency/cost are acceptable.
+3. Decide the research effort level:
+   - `deep` (default): most financial questions, including multi-company comparisons, earnings analysis, and regulatory research.
+   - `exhaustive`: complex financial research tasks where highest quality justifies longer latency and higher cost.
 4. Run the finance research agent as an evidence branch, not as an unbounded conversational agent.
-6. Treat the returned answer as a cited research artifact. Preserve its citations when synthesizing with other branches.
-7. If multiple branches disagree, prefer the branch with the most direct primary source and exact period/unit alignment.
+5. Treat the returned answer as a cited research artifact. Preserve its citations when synthesizing with other branches.
+6. If multiple branches disagree, prefer the branch with the most direct primary source and exact period/unit alignment.
 
 ## Handling Results
 
@@ -104,15 +117,15 @@ The broader orchestrator should:
 
 ## Reliability Notes
 
-The finance research agent is optimized for correctness over speed. It may be expensive relative to simple search because it runs parallel research branches and public-data/web-source verification.
+The finance research agent is optimized for correctness over speed. It may be expensive relative to simple search because it runs parallel research branches and multi-source verification.
 
 Use it deliberately:
 
-- Good: “Find the exact figure and cite the filing/report.”
-- Good: “Verify this macro value against official data.”
-- Good: “Resolve which of these conflicting finance values is source-correct.”
-- Bad: “Give me a quick opinion on whether to buy this stock.”
-- Bad: “Summarize today’s market news” unless exact cited finance evidence is required.
+- Good: "Find the exact figure and cite the filing/report."
+- Good: "Verify this macro value against official data."
+- Good: "Resolve which of these conflicting finance values is source-correct."
+- Bad: "Give me a quick opinion on whether to buy this stock."
+- Bad: "Summarize today's market news" unless exact cited finance evidence is required.
 
 ## Failure Policy
 
