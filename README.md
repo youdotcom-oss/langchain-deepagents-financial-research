@@ -20,7 +20,7 @@ Each preset provides a tailored system prompt, query decomposition strategy, and
 ```
 ├── .mcp.json                    # You.com MCP server config (alternative transport)
 ├── skills/
-│   └── you-finance/
+│   └── youdotcom-finance-research/
 │       ├── SKILL.md             # Finance Research API orchestration skill
 │       └── openapi_finance_research.yaml # OpenAPI spec for reference
 ├── src/
@@ -95,8 +95,8 @@ report = asyncio.run(run_finance_research(
 The agent uses a thin orchestration layer on top of the Finance Research API:
 
 1. **Preset selection** — Choose a research preset (`gdp` or `software_valuations`) that configures the system prompt, query decomposition strategy, and report structure.
-2. **Decompose** — Break the user's question into scoped `you-finance` queries with the right effort level (`standard`, `deep`, or `exhaustive`) and source control.
-3. **Query** — Call `you-finance` via direct HTTP (or MCP). The API internally runs parallel research branches, consults structured public data, and returns cited answers with `[[n]]` source tags.
+2. **Decompose** — Break the user's question into scoped `youdotcom-finance-research` queries with the right effort level (`standard`, `deep`, or `exhaustive`) and source control.
+3. **Query** — Call `youdotcom-finance-research` via direct HTTP (or MCP). The API internally runs parallel research branches, consults structured public data, and returns cited answers with `[[n]]` source tags.
 4. **Synthesize** — Merge results from multiple tool calls into a unified report with re-numbered citations.
 
 The agent does **not** duplicate work the Finance Research API already handles (source verification, cross-referencing, multi-step evidence gathering).

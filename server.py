@@ -72,8 +72,7 @@ def _check_auth(request: Request):
 
 
 _TOOL_LABELS: dict[str, str] = {
-    "you_finance": "Researching finance data",
-    "you-finance": "Researching finance data",
+    "youdotcom-finance-research": "Researching finance data",
     "task": "Delegating to subagent",
     "write_file": "Writing file",
     "read_file": "Reading file",
@@ -88,7 +87,7 @@ _TOOL_LABELS: dict[str, str] = {
 
 def _tool_args_preview(name: str, args: dict) -> str:
     """Return the most human-readable single arg for a tool call."""
-    if name in ("you_finance", "you-finance"):
+    if name in ("youdotcom-finance-research"):
         return args.get("input", "")[:300]
     if name == "task":
         return args.get("description", "")

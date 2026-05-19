@@ -35,14 +35,7 @@ TOOL_TRANSPORT = "http"
 # unreachable servers.
 HTTP_API_TIMEOUT = httpx.Timeout(30.0, read=None)
 
-# The endpoint URL. Switch between production and beta as needed:
-#   Production: "https://api.you.com/v1/research"
-#   Beta:       "https://ydc-finance-research-beta.up.railway.app/v1/finance_research"
-HTTP_ENDPOINT = "https://ydc-finance-research-beta.up.railway.app/v1/finance_research"
-
-# Whether to send the API key header. The beta endpoint doesn't require it;
-# production does (via X-API-Key).
-HTTP_SEND_API_KEY = False
+HTTP_ENDPOINT = "https://api.you.com/v1/finance_research"
 
 # ---------------------------------------------------------------------------
 # MCP transport settings (used when TOOL_TRANSPORT = "mcp")
@@ -50,7 +43,7 @@ HTTP_SEND_API_KEY = False
 # The MCP server exposes multiple tools; we filter to just "you-finance".
 # Note: langchain-mcp-adapters' allowedTools config is CLI-only, so we filter
 # manually in Python after calling get_tools().
-MCP_SERVER_URL = "https://api.you.com/mcp"
+MCP_SERVER_URL = "https://api.you.com/mcp?tools=you-finance"
 MCP_TOOL_NAME = "you-finance"
 
 # Custom httpx timeout for MCP — the default SSE read timeout is 300s which
@@ -83,18 +76,22 @@ def _mcp_http_client_factory(
 SKILLS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "skills",
-    "you-finance",
+    "youdotcom-finance-research",
 )
 
 
 def _load_skill_files() -> dict[str, any]:
-    """Load all files in the you-finance skill directory."""
+    """Load all files in the youdotcom-finance-research skill directory."""
     files = {}
     for filename in os.listdir(SKILLS_DIR):
+        if filename.startswith("."):
+            continue
         filepath = os.path.join(SKILLS_DIR, filename)
         if os.path.isfile(filepath):
             with open(filepath) as f:
-                files[f"/skills/you-finance/{filename}"] = create_file_data(f.read())
+                files[f"/skills/youdotcom-finance-research/{filename}"] = (
+                    create_file_data(f.read())
+                )
     return files
 
 
@@ -105,7 +102,7 @@ def _create_you_finance_tool(api_key: str):
     """Create a LangChain tool that calls the You.com Finance Research API via direct HTTP."""
 
     @tool(parse_docstring=True)
-    async def you_finance(
+    async def you_finance_research(
         input: str,
         research_effort: Literal["deep", "exhaustive"] = "deep",
     ) -> str:
@@ -127,9 +124,7 @@ def _create_you_finance_tool(api_key: str):
             "research_effort": research_effort,
         }
 
-        headers = {"Content-Type": "application/json"}
-        if HTTP_SEND_API_KEY:
-            headers["X-API-Key"] = api_key
+        headers = {"Content-Type": "application/json", "X-API-Key": api_key}
 
         last_error = None
         response = None
@@ -181,7 +176,7 @@ def _create_you_finance_tool(api_key: str):
 
         return result
 
-    return you_finance
+    return you_finance_research
 
 
 # ---------------------------------------------------------------------------

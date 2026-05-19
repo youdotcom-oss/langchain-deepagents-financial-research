@@ -42,11 +42,11 @@ Do not use the finance research agent as the first tool for:
 
 ## How To Invoke
 
-### Via MCP (preferred if the `you-finance` tool is available)
+### Via MCP
 
 The `you-finance` tool is served by the You.com MCP server:
 
-- **URL:** `https://api.you.com/mcp`
+- **URL:** `https://api.you.com/mcp?tools=you-finance`
 - **Auth:** `Authorization: Bearer <YDC_API_KEY>`
 
 Call the tool with:
